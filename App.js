@@ -1,12 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import AntDesign from "@expo/vector-icons/AntDesign";
+import Feather from '@expo/vector-icons/Feather';
+
+function formataDataHora(agora) {
+  const meses = [
+    "JANEIRO",
+    "FEVEREIRO",
+    "MARÇO",
+    "ABRIL",
+    "MAIO",
+    "JUNHO",
+    "JULHO",
+    "AGOSTO",
+    "SETEMBRO",
+    "OUTUBRO",
+    "NOVEMBRO",
+    "DEZEMBRO",
+  ];
+  const dia = agora.getDate();
+  const mes = meses[agora.getMonth()];
+  const hora = String(agora.getHours()).padStart(2, "0");
+  const minuto = String(agora.getMinutes()).padStart(2, "0");
+  return `${dia} DE ${mes}, ${hora}:${minuto}`;
+}
 
 export default function App() {
   const [ultimaFoto, setUltimaFoto] = useState(null);
   const [filtro, setFiltro] = useState("normal");
+  const [dataHora, setDataHora] = useState(formataDataHora(new Date()));
   const cameraRef = useRef(null);
   const [permission, requestCameraPermission] = useCameraPermissions();
 
@@ -22,6 +44,11 @@ export default function App() {
 
   useEffect(() => {
     quandoInicializa();
+    const interval = setInterval(() => {
+      setDataHora(formataDataHora(new Date()));
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (permission === null || !permission.granted) {
@@ -43,17 +70,20 @@ export default function App() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.seloDataHora}>
+        <Feather name="clock" size={12} color="#D2F000" />
+        <Text style={styles.seloTexto}>{dataHora}</Text>
+      </View>
       <View style={{ flex: 1, width: "100%", height: "100%" }}>
-  <CameraView
-  style={styles.camera}
-  facing="back"
-  ref={cameraRef}
-/>
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          ref={cameraRef}
+        />
 
-
-  {filtro === "vintage" && (
-    <View style={styles.vintageFilter} />
-  )}
+        {filtro === "vintage" && (
+          <View style={styles.vintageFilter} />
+        )}
 
   {filtro === "neon" && (
     <View style={styles.neonFilter} />
@@ -84,8 +114,10 @@ export default function App() {
       <TouchableOpacity
         style={styles.obturador}
         onPress={quandoPressionaObturador}
+        activeOpacity={0.8}
       >
-        <AntDesign name="aim" size={64} color="red" />
+        <View style={styles.obturadorInner}>
+        </View>
       </TouchableOpacity>
       {cameraPreview}
     </View>
@@ -146,17 +178,27 @@ filtroTexto: {
     bottom: 24,
     left: "50%",
     zIndex: 10,
-    backgroundColor: "transparent",
-    width: 96,
-    height: 96,
-    display: "flex",
+    width: 110,
+    height: 110,
+    marginLeft: -55,
+    borderRadius: 55,
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: -52,
-    borderRadius: 48,
-    borderWidth: 8,
-    borderColor: "red",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
+  obturadorInner: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.6,
+  },
+
   cameraPreview: {
     width: 200,
     height: 150,
@@ -164,5 +206,27 @@ filtroTexto: {
     top: 0,
     right: 0,
     zIndex: 10,
+  },
+  seloDataHora: {
+    position: "absolute",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    top: 50,
+    left: 16,
+    zIndex: 30,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  seloTexto: {
+    color: "#C6C9AB",
+    fontSize: 12,
+    letterSpacing: 0.4,
+    fontWeight: "600",
   },
 });
