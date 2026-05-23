@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Feather from '@expo/vector-icons/Feather';
+import { supabase } from './supabase';
 
 function formataDataHora(agora) {
   const meses = [
@@ -32,14 +33,61 @@ export default function App() {
   const cameraRef = useRef(null);
   const [permission, requestCameraPermission] = useCameraPermissions();
 
+  async function carregarImagem(uri) {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const nomeArquivo = `${Date.now()}.jpg`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('fotos')
+        .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+
+      if (uploadError) {
+        console.log('Erro ao enviar arquivo:', uploadError);
+        return null;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('fotos')
+        .getPublicUrl(nomeArquivo);
+
+      const publicUrl = publicUrlData?.publicUrl ?? null;
+
+      const dataAtual = new Date().toISOString();
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('fotos')
+        .insert({
+          img_url: publicUrl,
+          data_foto: dataAtual,
+          latitude: null,
+          longitude: null,
+        });
+
+      if (insertError) {
+        console.log('Erro ao inserir no banco:', insertError);
+      }
+
+      return publicUrl;
+    } catch (err) {
+      console.log('Erro em carregarImagem:', err);
+      return null;
+    }
+  }
+
   async function quandoInicializa() {
     await requestCameraPermission();
   }
 
   async function quandoPressionaObturador() {
+    console.log('Tirando foto...');
     const camera = cameraRef.current;
     const foto = await camera.takePictureAsync();
     setUltimaFoto(foto.uri);
+    const url = await carregarImagem(foto.uri);
+    console.log('URL da imagem enviada:', url);
   }
 
   useEffect(() => {
@@ -85,32 +133,32 @@ export default function App() {
           <View style={styles.vintageFilter} />
         )}
 
-  {filtro === "neon" && (
-    <View style={styles.neonFilter} />
-  )}
+        {filtro === "neon" && (
+          <View style={styles.neonFilter} />
+        )}
 
-  {filtro === "dark" && (
-    <View style={styles.darkFilter} />
-  )}
-</View>
+        {filtro === "dark" && (
+          <View style={styles.darkFilter} />
+        )}
+      </View>
 
-<View style={styles.filtrosContainer}>
-  <TouchableOpacity onPress={() => setFiltro("normal")}>
-    <Text style={styles.filtroTexto}>Normal</Text>
-  </TouchableOpacity>
+      <View style={styles.filtrosContainer}>
+        <TouchableOpacity onPress={() => setFiltro("normal")}>
+          <Text style={styles.filtroTexto}>Normal</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => setFiltro("vintage")}>
-    <Text style={styles.filtroTexto}>Vintage</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFiltro("vintage")}>
+          <Text style={styles.filtroTexto}>Vintage</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => setFiltro("neon")}>
-    <Text style={styles.filtroTexto}>Neon</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFiltro("neon")}>
+          <Text style={styles.filtroTexto}>Neon</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => setFiltro("dark")}>
-    <Text style={styles.filtroTexto}>Dark</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity onPress={() => setFiltro("dark")}>
+          <Text style={styles.filtroTexto}>Dark</Text>
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity
         style={styles.obturador}
         onPress={quandoPressionaObturador}
@@ -133,42 +181,42 @@ const styles = StyleSheet.create({
   },
 
   vintageFilter: {
-  position: "absolute",
-  width: "100%",
-  height: "100%",
-  backgroundColor: "rgba(120, 80, 40, 0.25)",
-},
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(120, 80, 40, 0.25)",
+  },
 
-neonFilter: {
-  position: "absolute",
-  width: "100%",
-  height: "100%",
-  backgroundColor: "rgba(0, 120, 255, 0.15)",
-},
+  neonFilter: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0, 120, 255, 0.15)",
+  },
 
-darkFilter: {
-  position: "absolute",
-  width: "100%",
-  height: "100%",
-  backgroundColor: "rgba(0,0,0,0.35)",
-},
-filtrosContainer: {
-  position: "absolute",
-  bottom: 140,
-  width: "100%",
-  flexDirection: "row",
-  justifyContent: "space-evenly",
-  zIndex: 20,
-},
+  darkFilter: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  filtrosContainer: {
+    position: "absolute",
+    bottom: 140,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    zIndex: 20,
+  },
 
-filtroTexto: {
-  color: "white",
-  fontSize: 16,
-  backgroundColor: "rgba(0,0,0,0.5)",
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 12,
-},
+  filtroTexto: {
+    color: "white",
+    fontSize: 16,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
   camera: {
     width: "100%",
     height: "100%",
