@@ -1,92 +1,165 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Image,
-} from "react-native";
-import { StatusBar } from "expo-status-bar";
+import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import Feather from '@expo/vector-icons/Feather';
+import { supabase } from '../supabase';
 import BottomNav from "../components/BottomNav";
-import { formatarDataLegivel } from "../utils/calendario";
-import { cores } from "../constants/theme";
 
-export default function CameraScreen({
-  diaSelecionado,
-  onSalvarFoto,
-  onIrCalendario,
-  onIrCamera,
-}) {
+function formataDataHora(agora) {
+  const meses = [
+    "JANEIRO",
+    "FEVEREIRO",
+    "MARÇO",
+    "ABRIL",
+    "MAIO",
+    "JUNHO",
+    "JULHO",
+    "AGOSTO",
+    "SETEMBRO",
+    "OUTUBRO",
+    "NOVEMBRO",
+    "DEZEMBRO",
+  ];
+  const dia = agora.getDate();
+  const mes = meses[agora.getMonth()];
+  const hora = String(agora.getHours()).padStart(2, "0");
+  const minuto = String(agora.getMinutes()).padStart(2, "0");
+  return `${dia} DE ${mes}, ${hora}:${minuto}`;
+}
+
+export default function CameraScreen({ diaSelecionado, onSalvarFoto, onIrCalendario, onIrCamera }) {
   const [ultimaFoto, setUltimaFoto] = useState(null);
   const [filtro, setFiltro] = useState("normal");
+  const [dataHora, setDataHora] = useState(formataDataHora(new Date()));
   const cameraRef = useRef(null);
   const [permission, requestCameraPermission] = useCameraPermissions();
 
-  useEffect(() => {
-    requestCameraPermission();
-  }, []);
+  async function carregarImagem(uri) {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const nomeArquivo = `${Date.now()}.jpg`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('fotos')
+        .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+
+      if (uploadError) {
+        console.log('Erro ao enviar arquivo:', uploadError);
+        return null;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('fotos')
+        .getPublicUrl(nomeArquivo);
+
+      const publicUrl = publicUrlData?.publicUrl ?? null;
+
+      const dataAtual = new Date().toISOString();
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('fotos')
+        .insert({
+          img_url: publicUrl,
+          data_foto: dataAtual,
+          latitude: null,
+          longitude: null,
+        });
+
+      if (insertError) {
+        console.log('Erro ao inserir no banco:', insertError);
+      }
+
+      return publicUrl;
+    } catch (err) {
+      console.log('Erro em carregarImagem:', err);
+      return null;
+    }
+  }
+
+  async function quandoInicializa() {
+    await requestCameraPermission();
+  }
 
   async function quandoPressionaObturador() {
+    console.log('Tirando foto...');
     const camera = cameraRef.current;
-    if (!camera) return;
-
     const foto = await camera.takePictureAsync();
     setUltimaFoto(foto.uri);
-
-    onSalvarFoto(diaSelecionado, foto.uri);
+    const url = await carregarImagem(foto.uri);
+    console.log('URL da imagem enviada:', url);
   }
+
+  useEffect(() => {
+    quandoInicializa();
+    const interval = setInterval(() => {
+      setDataHora(formataDataHora(new Date()));
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (permission === null || !permission.granted) {
     return (
-      <View style={styles.semPermissao}>
-        <Text style={styles.textoPermissao}>
-          Permissão de câmera não foi concedida :(
-        </Text>
+      <View>
+        <Text>Permissão de câmera não foi concedida :(</Text>
       </View>
     );
   }
 
-  const preview = ultimaFoto ? (
-    <Image style={styles.cameraPreview} source={{ uri: ultimaFoto }} />
-  ) : null;
+  const cameraPreview = ultimaFoto !== null && (
+    <Image
+      style={styles.cameraPreview}
+      source={{
+        uri: ultimaFoto,
+      }}
+    />
+  );
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      {diaSelecionado ? (
-        <View style={styles.faixaDia}>
-          <Text style={styles.faixaDiaTexto}>
-            Salvando em: {formatarDataLegivel(diaSelecionado)}
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.seloDataHora}>
+        <Feather name="clock" size={12} color="#D2F000" />
+        <Text style={styles.seloTexto}>{dataHora}</Text>
+      </View>
+      <View style={{ flex: 1, width: "100%", height: "100%" }}>
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          ref={cameraRef}
+        />
 
-      <View style={styles.areaCamera}>
-        <CameraView style={styles.camera} facing="back" ref={cameraRef} />
+        {filtro === "vintage" && (
+          <View style={styles.vintageFilter} />
+        )}
 
-        {filtro === "vintage" && <View style={styles.vintageFilter} />}
-        {filtro === "neon" && <View style={styles.neonFilter} />}
-        {filtro === "dark" && <View style={styles.darkFilter} />}
+        {filtro === "neon" && (
+          <View style={styles.neonFilter} />
+        )}
+
+        {filtro === "dark" && (
+          <View style={styles.darkFilter} />
+        )}
       </View>
 
       <View style={styles.filtrosContainer}>
-        {["normal", "vintage", "neon", "dark"].map((nome) => (
-          <TouchableOpacity key={nome} onPress={() => setFiltro(nome)}>
-            <Text
-              style={[
-                styles.filtroTexto,
-                filtro === nome && styles.filtroAtivo,
-              ]}
-            >
-              {nome.charAt(0).toUpperCase() + nome.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity onPress={() => setFiltro("normal")}>
+          <Text style={styles.filtroTexto}>Normal</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setFiltro("vintage")}>
+          <Text style={styles.filtroTexto}>Vintage</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setFiltro("neon")}>
+          <Text style={styles.filtroTexto}>Neon</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setFiltro("dark")}>
+          <Text style={styles.filtroTexto}>Dark</Text>
+        </TouchableOpacity>
       </View>
-
-      {preview}
-
       <View style={styles.navInferior}>
         <BottomNav
           telaAtiva="camera"
@@ -95,92 +168,91 @@ export default function CameraScreen({
           onObturador={quandoPressionaObturador}
         />
       </View>
+      {cameraPreview}
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: cores.fundo,
-  },
-  semPermissao: {
-    flex: 1,
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: cores.fundo,
   },
-  textoPermissao: {
-    color: cores.texto,
-    fontSize: 16,
-  },
-  faixaDia: {
-    position: "absolute",
-    top: 52,
-    left: 16,
-    right: 16,
-    zIndex: 15,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    borderWidth: 1,
-    borderColor: cores.destaque,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  faixaDiaTexto: {
-    color: cores.destaque,
-    fontSize: 13,
-    textAlign: "center",
-    textTransform: "capitalize",
-  },
-  areaCamera: {
-    flex: 1,
-    width: "100%",
-  },
-  camera: {
-    flex: 1,
-    width: "100%",
-  },
+
   vintageFilter: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     backgroundColor: "rgba(120, 80, 40, 0.25)",
   },
+
   neonFilter: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     backgroundColor: "rgba(0, 120, 255, 0.15)",
   },
+
   darkFilter: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   filtrosContainer: {
     position: "absolute",
-    bottom: 100,
+    bottom: 140,
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-evenly",
     zIndex: 20,
   },
+
   filtroTexto: {
-    color: cores.texto,
-    fontSize: 14,
+    color: "white",
+    fontSize: 16,
     backgroundColor: "rgba(0,0,0,0.5)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
-  filtroAtivo: {
-    backgroundColor: "rgba(196, 165, 116, 0.4)",
+  camera: {
+    width: "100%",
+    height: "100%",
   },
+
   cameraPreview: {
-    width: 100,
-    height: 75,
+    width: 200,
+    height: 150,
     position: "absolute",
-    top: 56,
-    right: 16,
+    top: 0,
+    right: 0,
     zIndex: 10,
-    borderRadius: 4,
+  },
+  seloDataHora: {
+    position: "absolute",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    top: 50,
+    left: 16,
+    zIndex: 30,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 2,
     borderWidth: 1,
-    borderColor: cores.borda,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  seloTexto: {
+    color: "#C6C9AB",
+    fontSize: 12,
+    letterSpacing: 0.4,
+    fontWeight: "600",
   },
   navInferior: {
     position: "absolute",
