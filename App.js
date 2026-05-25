@@ -14,10 +14,30 @@ export default function App() {
   const [diaSelecionado, setDiaSelecionado] = useState(chaveHoje());
 
   function salvarFoto(chave, uri) {
-    setFotosPorDia((anterior) => ({
+    setFotosPorDia((anterior) => {
+      const fotosAtuais = anterior[chave] ?? [];
+      return{
       ...anterior,
-      [chave]: uri,
-    }));
+      [chave]: [...fotosAtuais, uri],
+      }
+    });
+  }
+
+  function abrirFeed(chave) {
+    setDiaSelecionado(chave);
+    setTela("feed");
+  }
+
+  if (tela === "feed") {
+    return (
+      <FeedScreen
+        chave={diaSelecionado}
+        fotosLocais={fotosPorDia[diaSelecionado] ?? []}
+        onVoltar={() => setTela("calendario")}
+        onIrCamera={() => setTela("camera")}
+        onIrCalendario={() => setTela("calendario")}
+      />
+    );
   }
 
   if (tela === "calendario") {
@@ -26,6 +46,7 @@ export default function App() {
         fotosPorDia={fotosPorDia}
         diaSelecionado={diaSelecionado}
         onSelecionarDia={setDiaSelecionado}
+        onAbrirFeed={abrirFeed}
         onVoltar={() => setTela("camera")}
         onIrCamera={() => setTela("camera")}
         onIrCalendario={() => setTela("calendario")}

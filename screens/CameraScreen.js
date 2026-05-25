@@ -35,15 +35,19 @@ export default function CameraScreen({ diaSelecionado, onSalvarFoto, onIrCalenda
   const [permission, requestCameraPermission] = useCameraPermissions();
 
   async function carregarImagem(uri) {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
+     try {
+    const nomeArquivo = `${Date.now()}.jpg`;
 
-      const nomeArquivo = `${Date.now()}.jpg`;
+    const formData = new FormData();
+    formData.append('file', {
+      uri,
+      name: nomeArquivo,
+      type: 'image/jpeg',
+    });
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('fotos')
-        .upload(nomeArquivo, blob, { contentType: 'image/jpeg' });
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('fotos')
+      .upload(nomeArquivo, formData, { contentType: 'multipart/form-data' });
 
       if (uploadError) {
         console.log('Erro ao enviar arquivo:', uploadError);
@@ -89,7 +93,10 @@ export default function CameraScreen({ diaSelecionado, onSalvarFoto, onIrCalenda
     setUltimaFoto(foto.uri);
     const url = await carregarImagem(foto.uri);
     console.log('URL da imagem enviada:', url);
-  }
+      if (url) {
+        onSalvarFoto(diaSelecionado, url);
+      }
+}
 
   useEffect(() => {
     quandoInicializa();

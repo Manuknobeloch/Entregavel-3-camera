@@ -15,6 +15,7 @@ import {
   ehHoje,
   montarGradeCalendario,
   nomeMesAno,
+  formatarChaveData,
 } from "../utils/calendario";
 import BottomNav from "../components/BottomNav";
 import DiaDetalheModal from "../components/DiaDetalheModal";
@@ -28,14 +29,20 @@ export default function CalendarScreen({
   fotosPorDia,
   diaSelecionado,
   onSelecionarDia,
+  onAbrirFeed,
   onVoltar,
   onIrCamera,
   onIrCalendario,
 }) {
   const hoje = new Date();
+  const chaveHoje = formatarChaveData(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate()
+  );
   const [anoVisivel, setAnoVisivel] = useState(hoje.getFullYear());
   const [mesVisivel, setMesVisivel] = useState(hoje.getMonth());
-  const [diaModal, setDiaModal] = useState(null);
+
 
   const celulas = useMemo(
     () => montarGradeCalendario(anoVisivel, mesVisivel),
@@ -69,10 +76,18 @@ export default function CalendarScreen({
     onSelecionarDia(celula.chave);
     setDiaModal(celula.chave);
   }
+  function aoPressionarHoje() {
+    setAnoVisivel(hoje.getFullYear());
+    setMesVisivel(hoje.getMonth());
+    onSelecionarDia(chaveHoje);
+    onAbrirFeed(chaveHoje);
+  }
 
-  function aoTirarFotoNoDia() {
-    setDiaModal(null);
-    onIrCamera();
+  function primeiraFotoDoDia(chave) {
+    const entrada = fotosPorDia[chave];
+    if (!entrada) return null;
+    if (Array.isArray(entrada)) return entrada[0] ?? null;
+    return entrada;
   }
 
   return (
